@@ -190,16 +190,26 @@ else if (overall_shape == "square") {
 '''
 
 
-def get_image(fname):
+def get_image(fname, thresh, flip):
     ext = os.path.splitext(fname)[1]
     if ext.lower() == '.csv':
-        pixels = np.genfromtxt(fname, delimiter=',');
+        pixels = np.genfromtxt(fname, delimiter=',', filling_values=0);
+        if thresh is None:
+           thresh = 1
     else:
-        pixels = cv2.imread(fname);
-        # tbd flatten to 1 band if BGR/BGRA
-        pixels = (pixels != 0)
+        bands = cv2.imread(fname);
+        if len(bands.shape) == 2:
+            pixels = bands
+        else:
+            pixels = bands[:,:,0] # just grab the first band
+        if thresh is None:
+           thresh = np.average(pixels)
 
-    bits = (pixels!=0)
+    if flip:
+        bits = (pixels < thresh)
+    else:
+        bits = (pixels>=thresh)
+
     return bits
 
 
@@ -222,13 +232,17 @@ def img2str(img):
 parser = argparse.ArgumentParser("Customize the customizer")
 parser.add_argument('imgs', type=str, nargs=2, help='Filenames of pictures (csv or png/gif)')
 parser.add_argument('-u', '--unit', type=int, default=20, help='unit width (must be even, default 20)')
+parser.add_argument('--lthresh', type=int, help='binary cutoff for left image')
+parser.add_argument('--rthresh', type=int, help='binary cutoff for rght image')
+parser.add_argument('--lflip', action='store_true', help='flip the bits in the left image')
+parser.add_argument('--rflip', action='store_true', help='flip the bits in the rght image')
 args = parser.parse_args()
 
 if args.unit%1 or args.unit < 2 or args.unit > 40:
     raise ValueError('Unit width must be even, and not crazy sized')
 
-limg = get_image(args.imgs[0])
-rimg = get_image(args.imgs[1])
+limg = get_image(args.imgs[0], args.lthresh, args.lflip)
+rimg = get_image(args.imgs[1], args.rthresh, args.rflip)
 if limg.shape != rimg.shape:
     raise ValueError('Input images must be same shape')
 h,w = limg.shape
